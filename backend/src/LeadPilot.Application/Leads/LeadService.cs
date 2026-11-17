@@ -304,7 +304,9 @@ public sealed class LeadService(IAppDbContext db, ICurrentUser currentUser, IAud
                         || (firstToken.Length > 2 && l.NormalizedName.StartsWith(firstToken)
                             && ((probe.City != null && l.City == probe.City) || (probe.PinCode != null && l.PinCode == probe.PinCode))))
             .Take(50).ToListAsync(ct);
-        return candidates.Select(c => DuplicateDetector.Compare(probe, c)).OfType<DuplicateCandidate>().OrderByDescending(c => c.Score).ToList();
+        // Include leads added in the current unit of work but not yet saved (bulk import / discovery pages).
+        var pending = db.Leads.Local.Where(l => l.Id != excludeId && candidates.All(c => c.Id != l.Id));
+        return candidates.Concat(pending).Select(c => DuplicateDetector.Compare(probe, c)).OfType<DuplicateCandidate>().OrderByDescending(c => c.Score).ToList();
     }
 
     public async Task<List<DuplicatePairDto>> ListDuplicatePairsAsync(int max, CancellationToken ct)

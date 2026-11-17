@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace LeadPilot.Application.Outreach;
 
 public sealed record CreateEmailDraftRequest(Guid LeadId, Guid? PitchDraftId, string? ToAddress, string? Subject, string? Body, Guid? FollowUpId = null);
-public sealed record UpdateEmailDraftRequest(string ToAddress, string Subject, string Body, Guid? ConcurrencyStamp);
+public sealed record UpdateEmailDraftRequest(string ToAddress, string Subject, string Body, Guid? ConcurrencyStamp = null);
 /// <summary>The client must echo the hash + version it displayed, proving the user approved exactly that content.</summary>
 public sealed record ApproveEmailRequest(string ContentHash, int Version);
 public sealed record RejectEmailRequest(string? Reason);

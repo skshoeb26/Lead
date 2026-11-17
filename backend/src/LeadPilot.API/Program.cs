@@ -66,12 +66,12 @@ builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimiting:AuthPerMinute", 10), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("expensive", ctx => RateLimitPartition.GetFixedWindowLimiter(ctx.User.FindFirst("sub")?.Value ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimiting:ExpensivePerMinute", 30), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.User.FindFirst("sub")?.Value ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 300, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimiting:GlobalPerMinute", 300), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 var cors = config.GetSection(CorsOptions.Section).Get<CorsOptions>() ?? new CorsOptions();
@@ -101,7 +101,7 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 // ---------------- database migration + seed (configurable)
-if (config.GetValue("Database:MigrateOnStartup", true) && config.GetConnectionString("Postgres") is not null)
+if (config.GetValue("Database:MigrateOnStartup", true) && !string.IsNullOrWhiteSpace(config.GetConnectionString("Postgres")))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -111,7 +111,7 @@ if (config.GetValue("Database:MigrateOnStartup", true) && config.GetConnectionSt
     await scope.ServiceProvider.GetRequiredService<AuthService>().EnsureBootstrapOwnerAsync(CancellationToken.None);
 }
 
-if (jobsOptions.Enabled && jobsOptions.RunServerInApi && config.GetConnectionString("Postgres") is not null)
+if (jobsOptions.Enabled && jobsOptions.RunServerInApi && !string.IsNullOrWhiteSpace(config.GetConnectionString("Postgres")))
     RecurringJobs.Register(app.Services.GetRequiredService<IRecurringJobManager>(), jobsOptions);
 
 app.UseForwardedHeaders();
