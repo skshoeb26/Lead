@@ -177,6 +177,27 @@ import { SHARED, Toast } from '../../shared/ui';
               <mat-form-field class="grow"><mat-label>Schedule follow-up</mat-label><input matInput type="datetime-local" [(ngModel)]="followUpAt" /></mat-form-field>
               <button mat-stroked-button (click)="scheduleFollowUp()" [disabled]="!followUpAt">Add</button>
             </div>
+            <mat-expansion-panel class="flat">
+              <mat-expansion-panel-header><mat-panel-title><mat-icon>groups</mat-icon>&nbsp;Schedule meeting</mat-panel-title></mat-expansion-panel-header>
+              <div class="stack">
+                <mat-form-field><mat-label>When</mat-label><input matInput type="datetime-local" [(ngModel)]="meeting.at" /></mat-form-field>
+                <mat-form-field><mat-label>Where / link</mat-label><input matInput [(ngModel)]="meeting.location" placeholder="Google Meet link or address" /></mat-form-field>
+                <mat-form-field><mat-label>Agenda</mat-label><input matInput [(ngModel)]="meeting.agenda" /></mat-form-field>
+                <button mat-flat-button (click)="addMeeting()" [disabled]="!meeting.at">Save meeting</button>
+              </div>
+            </mat-expansion-panel>
+            <mat-expansion-panel class="flat">
+              <mat-expansion-panel-header><mat-panel-title><mat-icon>request_quote</mat-icon>&nbsp;Record proposal / deal</mat-panel-title></mat-expansion-panel-header>
+              <div class="stack">
+                <mat-form-field><mat-label>Title</mat-label><input matInput [(ngModel)]="proposal.title" placeholder="Enquiry management system" /></mat-form-field>
+                <mat-form-field><mat-label>Amount (₹)</mat-label><input matInput type="number" [(ngModel)]="proposal.amount" /></mat-form-field>
+                <div class="actions">
+                  <button mat-flat-button (click)="addProposal('Sent')" [disabled]="!proposal.title || !proposal.amount">Proposal sent</button>
+                  <button mat-stroked-button (click)="addProposal('Draft')" [disabled]="!proposal.title">Save draft</button>
+                  <button mat-stroked-button (click)="markWon()" [disabled]="!proposal.amount"><mat-icon>emoji_events</mat-icon>Mark won</button>
+                </div>
+              </div>
+            </mat-expansion-panel>
           </div>
           <div class="timeline">
             @for (a of activities(); track a.id) {
@@ -216,6 +237,8 @@ export class LeadDetailPage implements OnInit, OnDestroy {
   note = '';
   followUpAt = '';
   newContact: { type: ContactType; value: string; sourceUrl: string } = { type: 'Email', value: '', sourceUrl: '' };
+  meeting = { at: '', location: '', agenda: '' };
+  proposal: { title: string; amount: number | null } = { title: '', amount: null };
   private poll?: ReturnType<typeof setInterval>;
 
   async ngOnInit() { await this.load(); }
@@ -270,6 +293,33 @@ export class LeadDetailPage implements OnInit, OnDestroy {
     this.followUpAt = '';
     this.toast.ok(r.queued ? 'Saved offline — will sync.' : 'Follow-up scheduled.');
     if (!r.queued) await this.load();
+  }
+
+  async addMeeting() {
+    try {
+      await this.api.post('/crm/meetings', { leadId: this.id(), scheduledAt: new Date(this.meeting.at).toISOString(), durationMinutes: 30,
+        location: this.meeting.location || null, agenda: this.meeting.agenda || null, status: 'Scheduled' });
+      this.meeting = { at: '', location: '', agenda: '' };
+      this.toast.ok('Meeting scheduled.');
+      await this.load();
+    } catch (e) { this.toast.error(e); }
+  }
+
+  async addProposal(status: 'Draft' | 'Sent') {
+    try {
+      await this.api.post('/crm/proposals', { leadId: this.id(), title: this.proposal.title, amount: this.proposal.amount ?? 0, status });
+      this.toast.ok(status === 'Sent' ? 'Proposal recorded as sent.' : 'Proposal saved.');
+      await this.load();
+    } catch (e) { this.toast.error(e); }
+  }
+
+  async markWon() {
+    if (!confirm(`Mark this lead as Won for ₹${this.proposal.amount}?`)) return;
+    try {
+      await this.api.post(`/leads/${this.id()}/stage`, { stage: 'Won', actualValue: this.proposal.amount, note: this.proposal.title || 'Deal won' });
+      this.toast.ok('Congratulations! Marked as won.');
+      await this.load();
+    } catch (e) { this.toast.error(e); }
   }
 
   async addContact() {
