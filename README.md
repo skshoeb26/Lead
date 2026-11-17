@@ -16,6 +16,7 @@ AI-powered client-acquisition platform for an independent software developer in 
 - [Workflows](docs/WORKFLOW.md) — daily use, email safety state machine, system and release flow
 - [Architecture, database (ER diagram) & API](docs/ARCHITECTURE.md)
 - [Local development on Windows](docs/LOCAL-DEV-WINDOWS.md)
+- [**Free hosting: Oracle Cloud + DuckDNS (step by step, phone-friendly)**](docs/ORACLE-FREE-SETUP.md)
 - [Production deployment, hosting comparison, backup & restore](docs/DEPLOYMENT.md)
 - Integrations: [Claude](docs/SETUP-CLAUDE.md) · [Google Places](docs/SETUP-GOOGLE-PLACES.md) · [Gmail OAuth](docs/SETUP-GMAIL.md) · [Firebase push](docs/SETUP-FIREBASE.md)
 - [Security & compliance checklist](docs/SECURITY.md)
