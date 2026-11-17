@@ -1,0 +1,47 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+*.trx
+backend/.keys/
+**/keys/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+**/appsettings.Production.json
+**/appsettings.Local.json
+*.pfx
+*.p12
+*.jks
+*.keystore
+!**/debug.keystore
+google-services.json
+**/firebase-service-account*.json
+service-account*.json
+
+# Node / Angular
+node_modules/
+mobile/dist/
+mobile/.angular/
+mobile/www/
+coverage/
+
+# Android
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+mobile/android/captures/
+mobile/android/app/release/
+*.apk
+*.aab
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
