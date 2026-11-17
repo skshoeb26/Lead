@@ -1,0 +1,101 @@
+# LeadPilot AI production stack for a single Linux VPS (2 vCPU / 2-4 GB RAM is enough to start).
+# Usage:  cp .env.example .env  (fill in)  ->  docker compose up -d --build
+# The backend runs 24/7 here, independent of any laptop or phone.
+
+name: leadpilot
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-leadpilot}
+      POSTGRES_USER: ${POSTGRES_USER:-leadpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  api:
+    build: { context: ../backend, target: api }
+    image: leadpilot-api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB:-leadpilot};Username=${POSTGRES_USER:-leadpilot};Password=${POSTGRES_PASSWORD}
+      Jobs__RunServerInApi: "false"
+      DataProtection__KeysPath: /var/lib/leadpilot/keys
+    volumes:
+      - dpkeys:/var/lib/leadpilot/keys
+      - ./secrets:/run/secrets/leadpilot:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal, web]
+
+  worker:
+    build: { context: ../backend, target: worker }
+    image: leadpilot-worker:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB:-leadpilot};Username=${POSTGRES_USER:-leadpilot};Password=${POSTGRES_PASSWORD}
+      DataProtection__KeysPath: /var/lib/leadpilot/keys
+    volumes:
+      - dpkeys:/var/lib/leadpilot/keys        # shared with the API so encrypted Gmail tokens can be read by both
+      - ./secrets:/run/secrets/leadpilot:ro
+    depends_on:
+      api: { condition: service_started }     # API applies migrations first
+    networks: [internal]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./nginx/leadpilot.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - certbot-www:/var/www/certbot:ro
+      - certs:/etc/letsencrypt:ro
+    depends_on: [api]
+    networks: [web]
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certs:/etc/letsencrypt
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-leadpilot}
+      PGUSER: ${POSTGRES_USER:-leadpilot}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: /bin/sh -c 'while :; do /bin/sh /backup.sh; sleep 86400; done'
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal]
+
+volumes:
+  pgdata:
+  dpkeys:
+  certs:
+  certbot-www:
+
+networks:
+  internal:
+  web:

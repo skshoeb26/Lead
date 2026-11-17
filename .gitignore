@@ -45,3 +45,9 @@ mobile/android/app/release/
 Thumbs.db
 .idea/
 *.swp
+
+# Deployment secrets / data
+deploy/secrets/
+deploy/backups/
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/res/xml/config.xml
